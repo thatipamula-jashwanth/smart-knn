@@ -154,18 +154,13 @@ model.X_.shape
 ```
 
 ---
+| Parameter            | Description                | Range |
+| -------------------- | -------------------------- | ----- |
+| **k**                | Number of neighbors        | 3–15  |
+| **weight_threshold** | Drop features below weight | 0–0.2 |
+| **n_jobs**           | Parallel workers (future)  | 1–8   |
 
-#  Hyperparameters
-
-| Parameter          | Description                | Range |
-| ------------------ | -------------------------- | ----- |
-| `k`                | Number of neighbors        | 3–15  |
-| `weight_threshold` | Drop features below weight | 0–0.2 |
-| `alpha`            | MSE weight importance      | 0–1   |
-| `beta`             | MI importance              | 0–1   |
-| `gamma`            | RF importance              | 0–1   |
-| `n_jobs`           | Parallel workers           | 1–8   |
-
+(alpha/beta/gamma removed — not supported in current PyPI version)
 ---
 
 # 📁 Project Structure
