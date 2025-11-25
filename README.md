@@ -157,7 +157,7 @@ model.X_.shape
 | Parameter            | Description                | Range |
 | -------------------- | -------------------------- | ----- |
 | **k**                | Number of neighbors        | 3–15  |
-| **weight_threshold** | Drop features below weight | 0–0.2 |
+| **weight_threshold** | Drop features below weight | 0–0.5 |
 | **n_jobs**           | Parallel workers (future)  | 1–8   |
 
 (alpha/beta/gamma removed — not supported in current PyPI version)
