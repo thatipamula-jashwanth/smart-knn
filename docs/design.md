@@ -208,31 +208,31 @@ Each piece is modular, making the system easy to modify and experiment with.
 
 ```
                  ┌──────────────────────┐
-                 │      Raw Data        │
+                       Raw Data        
                  └──────────┬───────────┘
                             │
              ┌──────────────▼──────────────┐
-             │  Cleaning & Sanitization     │
+                Cleaning & Sanitization     
              └──────────────┬──────────────┘
                             │
-                     ┌──────▼──────┐
-                     │ Normalization│
+                     ┌-──────▼──────┐
+                       Normalization
                      └──────┬───────┘
                             │
                 ┌───────────▼───────────┐
-                │   Feature Weighting    │
+                    Feature Weighting    
                 └───────────┬───────────┘
                             │
                  ┌──────────▼───────────┐
-                 │   Feature Filtering   │
+                    Feature Filtering   
                  └──────────┬───────────┘
                             │
                  ┌──────────▼───────────┐
-                 │ Weighted Distance KNN │
+                   Weighted Distance KNN 
                  └──────────┬───────────┘
                             │
-                      ┌─────▼─────┐
-                      │ Prediction │
+                      ┌─────▼────-─┐
+                        Prediction 
                       └────────────┘
 ```
 
