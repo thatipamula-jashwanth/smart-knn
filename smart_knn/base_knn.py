@@ -73,7 +73,7 @@ class SmartKNN:
             X_f, w_f, mask = filter_low_weights(X_norm, w, threshold=self.weight_threshold, return_mask=True)
         except TypeError:
             X_f, w_f = filter_low_weights(X_norm, w, threshold=self.weight_threshold)
-            mask = w > self.weight_threshold       # FIX 2
+            mask = w > self.weight_threshold       
 
         if X_f.shape[1] == 0:
             raise RuntimeError("All features filtered out — lower weight_threshold.")
