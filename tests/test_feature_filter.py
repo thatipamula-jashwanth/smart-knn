@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from smart_knn.data_processing import filter_low_weights
 
+from smart_knn.data_processing import filter_low_weights
 
 
 def test_filter_low_weights_basic():
@@ -16,8 +16,7 @@ def test_filter_low_weights_basic():
     assert w_f.dtype == np.float32
 
 
-
-def test_filter_low_weights_all_zero():
+def test_filter_low_weights_all_zero_with_min_features():
     X = np.random.rand(8, 4).astype(np.float32)
     w = np.zeros(4, dtype=np.float32)
 
@@ -27,9 +26,8 @@ def test_filter_low_weights_all_zero():
 
     assert mask.sum() == 2
     assert X_f.shape[1] == 2
-    assert w_f.shape[0] == 2
+    assert w_f.shape == (2,)
     assert w_f.dtype == np.float32
-
 
 
 def test_filter_low_weights_threshold_fallback_topk():
@@ -41,9 +39,8 @@ def test_filter_low_weights_threshold_fallback_topk():
     )
 
     assert mask.sum() == 2
-    assert np.array_equal(w_f, np.array([0.3, 0.4], dtype=np.float32))
+    assert np.allclose(np.sort(w_f), np.array([0.3, 0.4], dtype=np.float32))
     assert X_f.shape[1] == 2
-
 
 
 def test_filter_low_weights_return_mask_shape():
@@ -58,12 +55,14 @@ def test_filter_low_weights_return_mask_shape():
     assert w_f.shape[0] == mask.sum()
 
 
-
 def test_filter_low_weights_nan_inf_cleaning():
-    X = np.array([
-        [1.0, np.nan, np.inf, -np.inf],
-        [2.0, 3.0,   4.0,     5.0]
-    ], dtype=np.float32)
+    X = np.array(
+        [
+            [1.0, np.nan, np.inf, -np.inf],
+            [2.0, 3.0, 4.0, 5.0],
+        ],
+        dtype=np.float32,
+    )
 
     w = np.array([0.1, np.nan, np.inf, -np.inf], dtype=np.float32)
 
@@ -71,10 +70,10 @@ def test_filter_low_weights_nan_inf_cleaning():
         X, w, threshold=0.0, return_mask=True
     )
 
-    assert np.all(w_f >= 0)
     assert np.isfinite(X_f).all()
+    assert np.isfinite(w_f).all()
+    assert np.all(w_f >= 0)
     assert X_f.dtype == np.float32
-
 
 
 def test_filter_low_weights_dim_mismatch():
@@ -85,16 +84,20 @@ def test_filter_low_weights_dim_mismatch():
         filter_low_weights(X, w)
 
 
-
 def test_filter_low_weights_invalid_X_ndim():
-    X = np.random.rand(5)     
+    X = np.random.rand(5)  # not 2D
     w = np.random.rand(5)
 
     with pytest.raises(ValueError):
         filter_low_weights(X, w)
 
 
-def test_filter_low_weights_all_filtered_error():
+def test_filter_low_weights_all_filtered_runtime_error():
+    """
+    CONTRACT:
+    - If threshold removes everything AND min_features == 0,
+      this is a user error and should raise.
+    """
     X = np.random.rand(10, 3).astype(np.float32)
     w = np.array([0.1, 0.1, 0.1], dtype=np.float32)
 

@@ -23,8 +23,8 @@ def _check_lengths(y_true, y_pred):
 
 
 def _clean_numeric(y):
-
-    if np.issubdtype(np.asarray(y).dtype, np.number):
+    y = np.asarray(y)
+    if np.issubdtype(y.dtype, np.number):
         return np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
     return y
 
@@ -49,6 +49,17 @@ def evaluate_regression(y_true, y_pred):
 
 
 
+def _map_labels_vectorized(y_pred_raw, class_to_idx):
+    classes = np.array(list(class_to_idx.keys()))
+    indices = np.array(list(class_to_idx.values()))
+
+    match = (y_pred_raw.reshape(-1, 1) == classes).argmax(axis=1)
+    valid = (y_pred_raw.reshape(-1, 1) == classes).any(axis=1)
+    result = indices[match]
+    result[~valid] = -1      
+    return result.astype(int)
+
+
 def evaluate_classification(y_true, y_pred):
     y_true_raw = _ensure_numpy(y_true)
     y_pred_raw = _ensure_numpy(y_pred)
@@ -57,16 +68,15 @@ def evaluate_classification(y_true, y_pred):
         classes, y_true_enc = np.unique(y_true_raw, return_inverse=True)
         class_to_idx = {c: i for i, c in enumerate(classes)}
 
-        pred_idx = np.array(
-            [class_to_idx.get(p, -1) for p in y_pred_raw],
-            dtype=int
-        )
+
+        y_pred_enc = _map_labels_vectorized(y_pred_raw, class_to_idx)
 
         y_true = y_true_enc
-        y_pred = pred_idx
+        y_pred = y_pred_enc
+
+
     else:
         y_true = y_true_raw.astype(int)
-
         if y_pred_raw.dtype.kind in "fc":
             y_pred = np.rint(y_pred_raw).astype(int)
         else:
@@ -89,28 +99,22 @@ def evaluate_classification(y_true, y_pred):
     }
 
 
-
 def evaluate_auto(y_true, y_pred):
     y_np = _ensure_numpy(y_true)
     kind = y_np.dtype.kind
 
-
     if kind in ("O", "U", "S"):
         return evaluate_classification(y_true, y_pred)
-
 
     if kind in ("i", "u"):
         if len(np.unique(y_np)) > 50:
             return evaluate_regression(y_true, y_pred)
         return evaluate_classification(y_true, y_pred)
 
-
     if kind == "f":
         return evaluate_regression(y_true, y_pred)
 
-
     return evaluate_classification(y_true, y_pred)
-
 
 
 def print_regression_report(metrics):

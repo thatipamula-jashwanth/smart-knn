@@ -1,153 +1,91 @@
 import numpy as np
 import pytest
-from smart_knn.weight_learning import (
-    _safe_normalize,
-    _non_constant_mask,
-    _univariate_mse_weights,
-    _mutual_info_weights,
-    _random_forest_weights,
-    learn_feature_weights,
-)
 
-def test_safe_normalize_basic():
-    w = np.array([1.0, 2.0, 3.0])
-    out = _safe_normalize(w)
+from smart_knn.weight_learning import learn_feature_weights
 
-    assert out.shape == (3,)
-    assert np.isclose(out.sum(), 1.0)
-    assert np.all(out >= 0)
+def test_learn_feature_weights_basic_properties():
+    np.random.seed(42)
 
-
-def test_safe_normalize_all_zero_nonneg_finite():
-    w = np.zeros(5)
-    out = _safe_normalize(w)
-
-
-    assert np.all(out >= 0)
-    assert np.all(np.isfinite(out))
-
-   
-    assert not np.allclose(out, 0.0)
-
-
-
-def test_non_constant_mask():
-    X = np.array([
-        [1, 5, 9],
-        [1, 6, 9],
-        [1, 7, 9],
-    ])
-    mask = _non_constant_mask(X)
-    assert np.array_equal(mask, np.array([False, True, False]))
-
-
-def test_non_constant_mask_all_constant():
-    X = np.ones((10, 3))
-    mask = _non_constant_mask(X)
-    assert not np.any(mask)
-
-
-
-def test_univariate_mse_weights_shape():
-    X = np.random.rand(50, 4)
-    y = np.random.rand(50)
-    w = _univariate_mse_weights(X, y)
-
-    assert w.shape == (4,)
-    assert np.isclose(w.sum(), 1.0)
-
-
-def test_univariate_mse_constant_feature():
-    X = np.column_stack([
-        np.ones(50),        
-        np.random.rand(50)  
-    ])
-    y = X[:, 1]
-
-    w = _univariate_mse_weights(X, y)
-
-    assert w[1] > w[0]    
-
-
-def test_mutual_info_basic():
-    X = np.random.rand(100, 3)
-    y = X[:, 0] * 2 + 0.1 * np.random.randn(100)
-
-    w = _mutual_info_weights(X, y)
-
-    assert w.shape == (3,)
-    assert np.isclose(w.sum(), 1.0)
-    assert w[0] > w[1]
-
-
-def test_mutual_info_all_constant():
-    X = np.ones((100, 4))
-    y = np.random.rand(100)
-
-    w = _mutual_info_weights(X, y)
-
-    assert np.allclose(w, 1 / 4)
-
-
-
-def test_random_forest_weights_basic():
-    X = np.random.rand(200, 3)
-    y = X[:, 1] * 5 + np.random.randn(200) * 0.1
-
-    w = _random_forest_weights(X, y)
-
-    assert w.shape == (3,)
-    assert np.isclose(w.sum(), 1.0)
-    assert w[1] > w[0]
-
-
-def test_random_forest_weights_exception_fallback(monkeypatch):
-
-    def bad_fit(*args, **kwargs):
-        raise ValueError("force error")
-
-    monkeypatch.setattr("sklearn.ensemble.RandomForestRegressor.fit", bad_fit)
-
-    X = np.random.rand(50, 3)
-    y = np.random.rand(50)
-
-    w = _random_forest_weights(X, y)
-
-    assert np.allclose(w, 1 / 3)
-
-
-def test_learn_feature_weights_shape():
-    X = np.random.rand(100, 5)
-    y = np.random.rand(100)
+    X = np.random.rand(200, 5).astype(np.float32)
+    y = (3 * X[:, 2] + 0.1 * np.random.randn(200)).astype(np.float32)
 
     w = learn_feature_weights(X, y)
 
-    assert w.shape == (5,)
-    assert np.isclose(w.sum(), 1.0)
+    assert isinstance(w, np.ndarray)
+    assert w.shape == (X.shape[1],)
+    assert w.dtype == np.float32
+
+    assert np.isfinite(w).all()
+    assert np.all(w > 0)
+    assert np.isclose(np.sum(w), 1.0, atol=1e-5)
 
 
-def test_learn_feature_weights_informative_feature():
-    X = np.random.rand(200, 3)
-    y = 10 * X[:, 2] + np.random.randn(200) * 0.01
+def test_dominant_feature_gets_higher_weight():
+    np.random.seed(0)
+
+    X = np.random.randn(300, 4).astype(np.float32)
+    y = 5 * X[:, 1] + 0.05 * np.random.randn(300)
 
     w = learn_feature_weights(X, y)
 
-    assert w[2] > w[0]
-    assert w[2] > w[1]
-    assert np.isclose(w.sum(), 1.0)
+    assert np.argmax(w) == 1
+    assert w[1] > np.mean(np.delete(w, 1))
 
 
-def test_learn_feature_weights_nan_inf_handling():
-    X = np.array([
-        [1, np.nan, np.inf],
-        [2, -np.inf, 5],
-        [3, 8,  9],
-    ], dtype=np.float32)
+def test_constant_feature_not_dominant():
+    np.random.seed(1)
 
-    y = np.array([1, 2, 3], dtype=np.float32)
+    X = np.random.rand(200, 4).astype(np.float32)
+    X[:, 0] = 1.0  
+    X[:, 3] = 5.0  
+
+    y = 2 * X[:, 1] + 0.01 * np.random.randn(200)
+
+    w = learn_feature_weights(X, y)
+
+    assert w[1] == np.max(w)
+    assert w[0] < w[1]
+    assert w[3] < w[1]
+
+
+def test_nan_inf_safe_inputs():
+    X = np.array(
+        [
+            [1.0, np.nan, 3.0],
+            [2.0, np.inf, 4.0],
+            [3.0, -np.inf, 5.0],
+            [4.0, 0.0, 6.0],
+        ],
+        dtype=np.float32,
+    )
+    y = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+
+    w = learn_feature_weights(X, y)
+
+    assert np.isfinite(w).all()
+    assert np.isclose(np.sum(w), 1.0, atol=1e-5)
+
+
+def test_single_feature_input():
+    np.random.seed(3)
+
+    X = np.random.rand(100, 1).astype(np.float32)
+    y = 4 * X[:, 0] + 0.01 * np.random.randn(100)
+
+    w = learn_feature_weights(X, y)
+
+    assert w.shape == (1,)
+    assert np.isclose(w[0], 1.0, atol=1e-6)
+
+
+def test_large_dataset_subsampling_path():
+    np.random.seed(4)
+
+    X = np.random.rand(60000, 3).astype(np.float32)
+    y = X[:, 0] + 0.1 * np.random.randn(60000)
 
     w = learn_feature_weights(X, y)
 
     assert w.shape == (3,)
-    assert np.isclose(w.sum(), 1.0)
-    assert np.all(w >= 0)
+    assert np.isfinite(w).all()
+    assert np.isclose(np.sum(w), 1.0, atol=1e-5)

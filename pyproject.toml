@@ -1,46 +1,60 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 
 [project]
 name = "smart-knn"
-version = "0.1.1" 
-description = "A smarter, weighted, feature-selective KNN algorithm with automatic preprocessing."
+version = "0.2.0"
+description = "A modern, weighted k-nearest neighbors algorithm with learned feature importance and fast CPU inference."
 readme = "README.md"
-license = { file = "LICENSE" }
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
 authors = [
-  { name="Jashwanth", email="thatipamulajashwanthgoud@gmail.com" }
+  { name = "Jashwanth Thatipamula", email = "thatipamulajashwanthgoud@gmail.com" }
 ]
-requires-python = ">=3.8"
 
 dependencies = [
-  "numpy>=1.21",
-  "pandas>=1.5",
+  "numpy>=1.22",
   "scikit-learn>=1.2",
-  "joblib>=1.2"
+  "joblib>=1.2",
+  "numba>=0.60"
 ]
 
 keywords = [
-  "knn",
   "machine-learning",
-  "smart-knn",
+  "knn",
+  "nearest-neighbors",
   "weighted-knn",
-  "feature-selection",
-  "distance-learning",
-  "auto-ml",
+  "interpretable-ml",
+  "cpu-ml",
+  "fast-inference",
+  "numba",
   "regression",
   "classification"
 ]
 
 classifiers = [
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3 :: Only",
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
-  "Intended Audience :: Science/Research",
-  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence"
 ]
+
+
+[project.urls]
+Homepage = "https://github.com/thatipamula-jashwanth/smart-knn"
+Documentation = "https://thatipamula-jashwanth.github.io/SmartEco/"
+Repository = "https://github.com/thatipamula-jashwanth/smart-knn"
+Issues = "https://github.com/thatipamula-jashwanth/smart-knn/issues"
 
 
 [tool.setuptools]
@@ -51,12 +65,10 @@ include-package-data = true
 where = ["."]
 include = ["smart_knn*"]
 exclude = [
+  ".github*",
   "benchmarks*",
+  "examples*",
   "docs*",
+  "tests*",
+  "heatmaps*"
 ]
-
-
-[project.urls]
-Homepage = "https://github.com/thatipamula-jashwanth/smart-knn"
-Documentation = "https://github.com/thatipamula-jashwanth/smart-knn"
-Issues = "https://github.com/thatipamula-jashwanth/smart-knn/issues"

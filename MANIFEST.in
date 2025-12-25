@@ -1,3 +1,8 @@
+# Exclude CI / non-library artifacts
+exclude .github/*
+exclude .github/*/*
+
+# Exclude heavy / dev-only artifacts
 exclude benchmarks/*
 exclude benchmarks/*/*
 exclude heatmaps/*

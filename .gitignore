@@ -9,4 +9,3 @@ build/
 *.egg
 
 .pytest_cache/
-
