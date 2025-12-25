@@ -15,7 +15,7 @@ from sklearn.datasets import fetch_openml
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
-
+``
 from smart_knn import SmartKNN
 
 warnings.filterwarnings("ignore")

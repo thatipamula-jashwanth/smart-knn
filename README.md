@@ -1,30 +1,30 @@
 <p align="center">
-  <img src="smart_knn/logo/SmartKNN.png" alt="SmartKNN Logo" width="160"/>
+  <img src="smart_knn/logo/SmartKNN.png" alt="SmartKNN logo" width="160" />
 </p>
 
 <h1 align="center">SmartKNN</h1>
 
 <p align="center">
-SmartKNN is a nearest-neighbor–based machine learning method that incorporates learned feature importance and adaptive neighbor search.
+A nearest-neighbor–based learning method with learned feature importance and adaptive neighbor search.
 </p>
 
 <p align="center">
   <a href="https://thatipamula-jashwanth.github.io/SmartEco/">
-    <img src="https://img.shields.io/badge/Website-SmartEco-blue?style=flat-square" />
+    <img src="https://img.shields.io/badge/Website-SmartEco-blue?style=flat-square" alt="Website"/>
   </a>
   <a href="https://pypi.org/project/smart-knn/">
-    <img src="https://img.shields.io/pypi/v/smart-knn?style=flat-square" />
+    <img src="https://img.shields.io/pypi/v/smart-knn?style=flat-square" alt="PyPI version"/>
   </a>
   <a href="https://pypi.org/project/smart-knn/">
-    <img src="https://img.shields.io/pypi/pyversions/smart-knn?style=flat-square" />
+    <img src="https://img.shields.io/pypi/pyversions/smart-knn?style=flat-square" alt="Python versions"/>
   </a>
   <a href="https://github.com/thatipamula-jashwanth/smart-knn/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/thatipamula-jashwanth/smart-knn/test.yml?style=flat-square" />
+    <img src="https://img.shields.io/github/actions/workflow/status/thatipamula-jashwanth/smart-knn/test.yml?style=flat-square" alt="CI status"/>
   </a>
   <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" />
+    <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License"/>
   </a>
-  <img src="https://img.shields.io/badge/Open%20to-Collaboration-success?style=flat-square" />
+  <img src="https://img.shields.io/badge/Open%20to-Collaboration-success?style=flat-square" alt="Open to collaboration"/>
 </p>
 
 ---
