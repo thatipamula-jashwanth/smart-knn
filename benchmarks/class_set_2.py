@@ -83,7 +83,10 @@ def benchmark_classification(df, target_col, dataset_name, output_dir):
     preprocessor = build_preprocessor(X)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=TEST_SIZE, random_state=SEED, stratify=y
+        X, y,
+        test_size=TEST_SIZE,
+        random_state=SEED,
+        stratify=y,
     )
 
     models = {
@@ -137,6 +140,7 @@ def benchmark_classification(df, target_col, dataset_name, output_dir):
     x_single = X_test_enc[[0]]
 
     best = None
+
     for wt in (0.0, 0.1):
         knn = SmartKNN(
             k=5,
@@ -156,10 +160,28 @@ def benchmark_classification(df, target_col, dataset_name, output_dir):
         acc, f1 = classification_metrics(y_test, preds)
         med, p95 = measure_single_latency(knn.predict, x_single)
 
-        if best is None or f1 > best["f1"]:
-            best = [f"SmartKNN (wt={wt})", acc, f1, train_t, batch_t, med, p95]
+        cand = dict(
+            wt=wt,
+            acc=acc,
+            f1=f1,
+            train=train_t,
+            batch=batch_t,
+            med=med,
+            p95=p95,
+        )
 
-    rows.append(best)
+        if best is None or cand["f1"] > best["f1"]:
+            best = cand
+
+    rows.append([
+        f"SmartKNN (wt={best['wt']})",
+        best["acc"],
+        best["f1"],
+        best["train"],
+        best["batch"],
+        best["med"],
+        best["p95"],
+    ])
 
     df_out = pd.DataFrame(
         rows,
