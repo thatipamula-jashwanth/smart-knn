@@ -11,6 +11,7 @@ on:
 jobs:
   benchmarks:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -20,6 +21,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -31,12 +33,13 @@ jobs:
         run: |
           echo "Benchmark filter pattern: '${{ github.event.inputs.pattern }}'"
           if [ -z "${{ github.event.inputs.pattern }}" ]; then
-            python benchmarks/run_benchmarks.py
+            python benchmarks/run_benchmark.py
           else
-            python benchmarks/run_benchmarks.py --pattern "${{ github.event.inputs.pattern }}"
+            python benchmarks/run_benchmark.py --pattern "${{ github.event.inputs.pattern }}"
           fi
 
       - name: Upload benchmark results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: smartknn-benchmark-results
