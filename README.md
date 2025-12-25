@@ -5,7 +5,7 @@
 <h1 align="center">SmartKNN</h1>
 
 <p align="center">
-A nearest-neighbor–based learning method with learned feature importance and adaptive neighbor search.
+A modern, weighted nearest-neighbor learning algorithm with learned feature importance and adaptive neighbor search.
 </p>
 
 <p align="center">
@@ -16,18 +16,15 @@ A nearest-neighbor–based learning method with learned feature importance and a
     <img src="https://img.shields.io/pypi/v/smart-knn?style=flat-square" alt="PyPI version"/>
   </a>
   <a href="https://pypi.org/project/smart-knn/">
-    <img src="https://img.shields.io/pypi/pyversions/smart-knn?style=flat-square" alt="Python versions"/>
+    <img src="https://img.shields.io/badge/Python-3.8%2B-blue?style=flat-square" alt="Python versions"/>
   </a>
   <a href="https://github.com/thatipamula-jashwanth/smart-knn/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/thatipamula-jashwanth/smart-knn/test.yml?style=flat-square" alt="CI status"/>
+    <img src="https://img.shields.io/github/actions/workflow/status/thatipamula-jashwanth/smart-knn/ci-tests.yml?style=flat-square" alt="CI status"/>
   </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License"/>
   </a>
-  <img src="https://img.shields.io/badge/Open%20to-Collaboration-success?style=flat-square" alt="Open to collaboration"/>
 </p>
-
----
 
 ## Overview
 

@@ -1,42 +1,53 @@
-#  SmartKNN Benchmarks
+# SmartKNN Benchmarks
 
-This directory contains **reproducible benchmarks** for **SmartKNN**, covering
-both **classification** and **regression** performance against common ML baselines.
+This directory contains **reproducible, engineering-focused benchmarks** for
+**SmartKNN**, covering both **classification** and **regression** tasks.
 
-Benchmarks focus on **accuracy, latency, and scalability**.
-They are intended for **engineering validation**, not marketing claims.
+The benchmarks are intended for **internal validation and analysis**, with an
+emphasis on:
+
+- predictive performance (accuracy / error)
+- inference latency
+- scalability characteristics
+
+They are **not marketing benchmarks** and are not automatically executed.
 
 ---
 
-##  Benchmark Sets
+## Benchmark Sets
 
 ### Classification
-- **class_set_1.py** — SmartKNN vs GBM models
-- **class_set_2.py** — SmartKNN vs classical baselines
+- **class_set_1.py** — SmartKNN vs gradient-boosted models (XGBoost, LightGBM, CatBoost)
+- **class_set_2.py** — SmartKNN vs classical baselines (Logistic Regression, KNN, Trees)
 
 ### Regression
-- **regression_set_1.py** — SmartKNN vs GBM models
-- **regression_set_2.py** — SmartKNN vs classical baselines
+- **regression_set_1.py** — SmartKNN vs gradient-boosted models
+- **regression_set_2.py** — SmartKNN vs classical regression baselines
 
 ---
 
-##  Running Benchmarks
+## Running Benchmarks
 
 From the project root:
 
 ```bash
-python benchmarks/run_benchmarks.py
+python -m benchmarks.run_benchmark
 ```
 
-## Run a subset
+---
 
-Benchmarks are auto-discovered by filename.
-You can filter runs using patterns:
+## Running a Subset of Benchmarks
 
-python benchmarks/run_benchmarks.py --pattern class
-python benchmarks/run_benchmarks.py --pattern regression
-python benchmarks/run_benchmarks.py --pattern set_1
-python benchmarks/run_benchmarks.py --pattern set_2
+You can selectively run benchmarks using a substring filter:
+
+```bash
+python -m benchmarks.run_benchmark --pattern class
+python -m benchmarks.run_benchmark --pattern regression
+python -m benchmarks.run_benchmark --pattern set_1
+python -m benchmarks.run_benchmark --pattern set_2
+```
+
+This allows targeted evaluation without modifying code.
 
 ---
 
@@ -44,38 +55,12 @@ python benchmarks/run_benchmarks.py --pattern set_2
 
 All benchmark outputs are written to:
 
-benchmarks/results/
+- benchmarks/results/
 
-Results are not committed to the repository.
+Results are stored as CSV files and are not committed to the repository.
 
-In CI, results are uploaded as workflow artifacts.
+These files are intended for:
 
----
-
-## Continuous Integration (CI)
-Benchmarks are executed via GitHub Actions (benchmarks.yml) using:
-
-- Manual workflow triggers
-- Optional pattern-based filtering
-
-Benchmark failures do not block pull requests.
-
----
-
-## Adding New Benchmarks
-
-1. Add a new file:
-benchmarks/<type>_set_<n>.py
-
-2. Implement:
-def run(output_dir: str):
-    ...
-3. Write all results to output_dir
-No CI changes are required.
-
----
-
-**SmartKNN benchmarks are designed to be transparent, reproducible, and fair.**
-
-
-
+- local inspection
+- offline analysis
+- report generation
