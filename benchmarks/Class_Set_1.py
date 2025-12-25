@@ -2,6 +2,7 @@ import warnings
 import time
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
@@ -9,7 +10,6 @@ from sklearn.metrics import accuracy_score, f1_score
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
-
 from sklearn.datasets import fetch_openml
 
 from xgboost import XGBClassifier
@@ -17,7 +17,6 @@ from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
 
 from smart_knn import SmartKNN
-
 
 warnings.filterwarnings("ignore")
 
@@ -65,7 +64,6 @@ def safe_target(df, target_col):
         y = df[target_col]
         X = df.drop(columns=[target_col])
     else:
-        print(f"[WARN] Target '{target_col}' not found — using last column.")
         y = df.iloc[:, -1]
         X = df.iloc[:, :-1]
 
@@ -77,25 +75,16 @@ def safe_target(df, target_col):
     return X, y
 
 
-def benchmark_classification(df, target_col, name):
-
+def benchmark_classification(df, target_col, dataset_name, output_dir):
     X, y = safe_target(df, target_col)
     preprocessor = build_preprocessor(X)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
+        X, y,
         test_size=TEST_SIZE,
         random_state=SEED,
         stratify=y,
     )
-
-    print(f"\n CLASSIFICATION ")
-    print(
-        "Model                     | ACC ↑  | Macro-F1 ↑ | Train(s) | "
-        "Batch Pred(s) | Single Med(ms) | Single P95(ms)"
-    )
-    print("-" * 150)
 
     base_models = {
         "XGBoost": XGBClassifier(
@@ -128,9 +117,9 @@ def benchmark_classification(df, target_col, name):
     X_test_enc = preprocessor.transform(X_test)
     x_single = X_test_enc[[0]]
 
-   
-    for name_m, model in base_models.items():
+    rows = []
 
+    for name_m, model in base_models.items():
         pipe = Pipeline([
             ("prep", preprocessor),
             ("model", clone(model)),
@@ -146,22 +135,14 @@ def benchmark_classification(df, target_col, name):
 
         acc, f1 = classification_metrics(y_test, preds)
 
-        core_model = clone(model)
-        core_model.fit(X_train_enc, y_train)
-        single_med, single_p95 = measure_single_latency(
-            core_model.predict, x_single
-        )
+        core = clone(model)
+        core.fit(X_train_enc, y_train)
+        med, p95 = measure_single_latency(core.predict, x_single)
 
-        print(
-            f"{name_m:25s} | {acc:6.4f} | {f1:10.4f} | "
-            f"{train_t:7.3f} | {batch_t:13.4f} | "
-            f"{single_med:15.3f} | {single_p95:15.3f}"
-        )
-
+        rows.append([name_m, acc, f1, train_t, batch_t, med, p95])
 
     best = None
     for wt in (0.0, 0.1):
-
         knn = SmartKNN(
             k=5,
             backend="auto",
@@ -178,51 +159,46 @@ def benchmark_classification(df, target_col, name):
         batch_t = time.perf_counter() - t0
 
         acc, f1 = classification_metrics(y_test, preds)
-        single_med, single_p95 = measure_single_latency(knn.predict, x_single)
+        med, p95 = measure_single_latency(knn.predict, x_single)
 
         if best is None or f1 > best["f1"]:
             best = dict(
+                model="SmartKNN",
+                acc=acc, f1=f1,
+                train=train_t, batch=batch_t,
+                med=med, p95=p95,
                 wt=wt,
-                acc=acc,
-                f1=f1,
-                train=train_t,
-                batch=batch_t,
-                med=single_med,
-                p95=single_p95,
             )
 
-    print(
-        f"{'SmartKNN (best)':25s} | "
-        f"{best['acc']:6.4f} | {best['f1']:10.4f} | "
-        f"{best['train']:7.3f} | {best['batch']:13.4f} | "
-        f"{best['med']:15.3f} | {best['p95']:15.3f}"
+    rows.append([
+        f"SmartKNN (wt={best['wt']})",
+        best["acc"], best["f1"],
+        best["train"], best["batch"],
+        best["med"], best["p95"],
+    ])
+
+    df_out = pd.DataFrame(
+        rows,
+        columns=[
+            "model", "accuracy", "macro_f1",
+            "train_s", "batch_s",
+            "single_med_ms", "single_p95_ms",
+        ],
     )
-    print(f"  selected weight_threshold = {best['wt']}")
+
+    out_path = Path(output_dir) / f"{dataset_name.replace(' ', '_').lower()}.csv"
+    df_out.to_csv(out_path, index=False)
+    print(f"[SAVED] {out_path}")
 
 
-
-def load_and_run():
+def run(output_dir):
+    output_dir = Path(output_dir)
 
     adult = fetch_openml(name="adult", as_frame=True)
-    benchmark_classification(
-        adult.frame,
-        "class",
-        "Adult Income (48K)"
-    )
+    benchmark_classification(adult.frame, "class", "adult_income", output_dir)
 
     bank = fetch_openml(name="bank-marketing", as_frame=True)
-    benchmark_classification(
-        bank.frame,
-        "class",
-        "Bank Marketing (45K)"
-    )
+    benchmark_classification(bank.frame, "class", "bank_marketing", output_dir)
 
     bank_id = fetch_openml(data_id=1486, as_frame=True)
-    benchmark_classification(
-        bank_id.frame,
-        "class",
-        "Bank Marketing (ID 1486 | 45K)"
-    )
-
-if __name__ == "__main__":
-    load_and_run()
+    benchmark_classification(bank_id.frame, "class", "bank_marketing_id1486", output_dir)

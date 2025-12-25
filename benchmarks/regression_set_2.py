@@ -1,7 +1,8 @@
-import warnings
 import time
+import warnings
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
@@ -17,7 +18,6 @@ from lightgbm import LGBMRegressor
 from catboost import CatBoostRegressor
 
 from smart_knn import SmartKNN
-
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -35,7 +35,6 @@ def regression_metrics(y_true, y_pred):
 
 
 def measure_single_latency(fn, x, runs=LAT_RUNS):
-    """Single-row inference latency (MODEL ONLY), milliseconds."""
     for _ in range(WARMUP_RUNS):
         fn(x)
 
@@ -58,16 +57,18 @@ def build_preprocessor(df):
     else:
         encoder = OrdinalEncoder(
             handle_unknown="use_encoded_value",
-            unknown_value=-1
+            unknown_value=-1,
         )
         enc_type = "ordinal"
 
     print(f"[INFO] Encoding={enc_type} | rows={len(df)} | cat_cols={len(cat_cols)}")
 
-    return ColumnTransformer([
-        ("num", "passthrough", num_cols),
-        ("cat", encoder, cat_cols),
-    ])
+    return ColumnTransformer(
+        [
+            ("num", "passthrough", num_cols),
+            ("cat", encoder, cat_cols),
+        ]
+    )
 
 
 def safe_target(df, target_col):
@@ -75,7 +76,6 @@ def safe_target(df, target_col):
         y = df[target_col]
         X = df.drop(columns=[target_col])
     else:
-        print(f"[WARN] Target '{target_col}' not found — using last column.")
         y = df.iloc[:, -1]
         X = df.iloc[:, :-1]
 
@@ -89,21 +89,15 @@ def safe_target(df, target_col):
     return X, y
 
 
-def benchmark_regression(df, target_col, name):
-
+def benchmark_regression(df, target_col, dataset_name, output_dir):
     X, y = safe_target(df, target_col)
     preprocessor = build_preprocessor(X)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=TEST_SIZE, random_state=SEED
+        X, y,
+        test_size=TEST_SIZE,
+        random_state=SEED,
     )
-
-    print(f"\n REGRESSION ")
-    print(
-        "Model        | RMSE ↓ | R² ↑  | Train(s) | "
-        "Batch Pred(s) | Single Med(ms) | Single P95(ms)"
-    )
-    print("-" * 130)
 
     base_models = {
         "XGBoost": XGBRegressor(
@@ -112,14 +106,14 @@ def benchmark_regression(df, target_col, name):
             learning_rate=0.1,
             tree_method="hist",
             n_jobs=1,
-            random_state=SEED
+            random_state=SEED,
         ),
         "LightGBM": LGBMRegressor(
             n_estimators=200,
             learning_rate=0.1,
             n_jobs=1,
             random_state=SEED,
-            verbose=-1
+            verbose=-1,
         ),
         "CatBoost": CatBoostRegressor(
             iterations=200,
@@ -127,14 +121,15 @@ def benchmark_regression(df, target_col, name):
             learning_rate=0.1,
             thread_count=1,
             random_seed=SEED,
-            verbose=False
+            verbose=False,
         ),
     }
-
 
     X_train_enc = preprocessor.fit_transform(X_train)
     X_test_enc = preprocessor.transform(X_test)
     x_single = X_test_enc[[0]]
+
+    rows = []
 
     for name_m, model in base_models.items():
         pipe = Pipeline([
@@ -152,18 +147,13 @@ def benchmark_regression(df, target_col, name):
 
         rmse, r2 = regression_metrics(y_test, preds)
 
-        core_model = clone(model)
-        core_model.fit(X_train_enc, y_train)
-        single_med, single_p95 = measure_single_latency(core_model.predict, x_single)
+        core = clone(model)
+        core.fit(X_train_enc, y_train)
+        med, p95 = measure_single_latency(core.predict, x_single)
 
-        print(
-            f"{name_m:12s} | {rmse:7.4f} | {r2:6.4f} | "
-            f"{train_t:7.3f} | {batch_t:13.4f} | "
-            f"{single_med:15.3f} | {single_p95:15.3f}"
-        )
+        rows.append([name_m, rmse, r2, train_t, batch_t, med, p95])
 
     best = None
-
     for wt in (0.0, 0.1):
         knn = SmartKNN(k=5, backend="auto", weight_threshold=wt)
 
@@ -176,41 +166,46 @@ def benchmark_regression(df, target_col, name):
         batch_t = time.perf_counter() - t0
 
         rmse, r2 = regression_metrics(y_test, preds)
+        med, p95 = measure_single_latency(knn.predict, x_single)
 
-        single_med, single_p95 = measure_single_latency(knn.predict, x_single)
+        cand = ["SmartKNN", rmse, r2, train_t, batch_t, med, p95, wt]
+        if best is None or r2 > best[2] or (r2 == best[2] and rmse < best[1]):
+            best = cand
 
-        candidate = {
-            "wt": wt,
-            "rmse": rmse,
-            "r2": r2,
-            "train": train_t,
-            "batch": batch_t,
-            "med": single_med,
-            "p95": single_p95,
-        }
+    rows.append(best[:-1])
 
-        if best is None or r2 > best["r2"] or (r2 == best["r2"] and rmse < best["rmse"]):
-            best = candidate
-
-    print(
-        f"{'SmartKNN*':12s} | {best['rmse']:7.4f} | {best['r2']:6.4f} | "
-        f"{best['train']:7.3f} | {best['batch']:13.4f} | "
-        f"{best['med']:15.3f} | {best['p95']:15.3f}"
+    df_out = pd.DataFrame(
+        rows,
+        columns=[
+            "model",
+            "rmse",
+            "r2",
+            "train_s",
+            "batch_s",
+            "single_med_ms",
+            "single_p95_ms",
+        ],
     )
-    print(f" selected weight_threshold = {best['wt']}")
+
+    out = Path(output_dir) / f"{dataset_name.replace(' ', '_').lower()}_gbm.csv"
+    df_out.to_csv(out, index=False)
+    print(f"[SAVED] {out}")
 
 
-def load_and_run():
+def run(output_dir):
+    output_dir = Path(output_dir)
 
     cal = fetch_california_housing(as_frame=True)
-    benchmark_regression(cal.frame, "MedHouseVal", "California Housing")
+    benchmark_regression(
+        cal.frame, "MedHouseVal", "california_housing", output_dir
+    )
 
     bike = fetch_openml(name="Bike_Sharing_Demand", as_frame=True)
-    benchmark_regression(bike.frame, "count", "Bike Sharing Demand")
+    benchmark_regression(
+        bike.frame, "count", "bike_sharing_demand", output_dir
+    )
 
     kc = fetch_openml(name="house_sales", as_frame=True)
-    benchmark_regression(kc.frame, "price", "House Sales (King County)")
-
-
-if __name__ == "__main__":
-    load_and_run()
+    benchmark_regression(
+        kc.frame, "price", "house_sales_king_county", output_dir
+    )

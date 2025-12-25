@@ -31,6 +31,7 @@ jobs:
 
       - name: Run SmartKNN benchmarks
         run: |
+          export PYTHONPATH=$(pwd)
           echo "Benchmark filter pattern: '${{ github.event.inputs.pattern }}'"
           if [ -z "${{ github.event.inputs.pattern }}" ]; then
             python benchmarks/run_benchmark.py

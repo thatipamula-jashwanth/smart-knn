@@ -2,6 +2,7 @@ import warnings
 import time
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
@@ -66,7 +67,6 @@ def safe_target(df, target_col):
         y = df[target_col]
         X = df.drop(columns=[target_col])
     else:
-        print(f"[WARN] Target '{target_col}' not found — using last column.")
         y = df.iloc[:, -1]
         X = df.iloc[:, :-1]
 
@@ -78,8 +78,7 @@ def safe_target(df, target_col):
     return X, y
 
 
-def benchmark_classification(df, target_col, name):
-
+def benchmark_classification(df, target_col, dataset_name, output_dir):
     X, y = safe_target(df, target_col)
     preprocessor = build_preprocessor(X)
 
@@ -87,36 +86,19 @@ def benchmark_classification(df, target_col, name):
         X, y, test_size=TEST_SIZE, random_state=SEED, stratify=y
     )
 
-    print(f"\nCLASSIFICATION ")
-    print(
-        "Model                     | ACC ↑  | Macro-F1 ↑ | Train(s) | "
-        "Batch Pred(s) | Single Med(ms) | Single P95(ms)"
-    )
-    print("-" * 150)
-
     models = {
-        "LogisticRegression": (
-            LogisticRegression(max_iter=1000, n_jobs=1),
-            True,
-        ),
-        "KNN": (
-            KNeighborsClassifier(n_neighbors=5),
-            True,
-        ),
-        "DecisionTree": (
-            DecisionTreeClassifier(random_state=SEED),
-            False,
-        ),
+        "LogisticRegression": (LogisticRegression(max_iter=1000, n_jobs=1), True),
+        "KNN": (KNeighborsClassifier(n_neighbors=5), True),
+        "DecisionTree": (DecisionTreeClassifier(random_state=SEED), False),
         "RandomForest": (
-            RandomForestClassifier(
-                n_estimators=150, random_state=SEED, n_jobs=1
-            ),
+            RandomForestClassifier(n_estimators=150, random_state=SEED, n_jobs=1),
             False,
         ),
     }
 
-    for name_m, (model, needs_scaling) in models.items():
+    rows = []
 
+    for name_m, (model, needs_scaling) in models.items():
         steps = [("prep", preprocessor)]
         if needs_scaling:
             steps.append(("scaler", StandardScaler()))
@@ -141,21 +123,14 @@ def benchmark_classification(df, target_col, name):
         if needs_scaling:
             scaler = StandardScaler().fit(X_enc)
             core_model.fit(scaler.transform(X_enc), y_train)
-            single_med, single_p95 = measure_single_latency(
+            med, p95 = measure_single_latency(
                 lambda z: core_model.predict(scaler.transform(z)), x_single
             )
         else:
             core_model.fit(X_enc, y_train)
-            single_med, single_p95 = measure_single_latency(
-                core_model.predict, x_single
-            )
+            med, p95 = measure_single_latency(core_model.predict, x_single)
 
-        print(
-            f"{name_m:25s} | {acc:6.4f} | {f1:10.4f} | "
-            f"{train_t:7.3f} | {batch_t:13.4f} | "
-            f"{single_med:15.3f} | {single_p95:15.3f}"
-        )
-
+        rows.append([name_m, acc, f1, train_t, batch_t, med, p95])
 
     X_train_enc = preprocessor.fit_transform(X_train)
     X_test_enc = preprocessor.transform(X_test)
@@ -163,7 +138,6 @@ def benchmark_classification(df, target_col, name):
 
     best = None
     for wt in (0.0, 0.1):
-
         knn = SmartKNN(
             k=5,
             backend="auto",
@@ -180,42 +154,41 @@ def benchmark_classification(df, target_col, name):
         batch_t = time.perf_counter() - t0
 
         acc, f1 = classification_metrics(y_test, preds)
-        single_med, single_p95 = measure_single_latency(knn.predict, x_single)
+        med, p95 = measure_single_latency(knn.predict, x_single)
 
         if best is None or f1 > best["f1"]:
-            best = dict(
-                wt=wt,
-                acc=acc,
-                f1=f1,
-                train=train_t,
-                batch=batch_t,
-                med=single_med,
-                p95=single_p95,
-            )
+            best = [f"SmartKNN (wt={wt})", acc, f1, train_t, batch_t, med, p95]
 
-    print(
-        f"{'SmartKNN (best)':25s} | "
-        f"{best['acc']:6.4f} | {best['f1']:10.4f} | "
-        f"{best['train']:7.3f} | {best['batch']:13.4f} | "
-        f"{best['med']:15.3f} | {best['p95']:15.3f}"
+    rows.append(best)
+
+    df_out = pd.DataFrame(
+        rows,
+        columns=[
+            "model",
+            "accuracy",
+            "macro_f1",
+            "train_s",
+            "batch_s",
+            "single_med_ms",
+            "single_p95_ms",
+        ],
     )
-    print(f" selected weight_threshold = {best['wt']}")
+
+    out = Path(output_dir) / f"{dataset_name}.csv"
+    df_out.to_csv(out, index=False)
+    print(f"[SAVED] {out}")
 
 
-
-def load_and_run():
+def run(output_dir):
+    output_dir = Path(output_dir)
 
     adult = fetch_openml(name="adult", as_frame=True)
-    benchmark_classification(adult.frame, "class", "Adult Income (48K)")
+    benchmark_classification(adult.frame, "class", "adult_income_sklearn", output_dir)
 
     bank = fetch_openml(name="bank-marketing", as_frame=True)
-    benchmark_classification(bank.frame, "class", "Bank Marketing (45K)")
+    benchmark_classification(bank.frame, "class", "bank_marketing_sklearn", output_dir)
 
     bank_id = fetch_openml(data_id=1486, as_frame=True)
     benchmark_classification(
-        bank_id.frame, "class", "Bank Marketing (ID 1486 | 45K)"
+        bank_id.frame, "class", "bank_marketing_id1486_sklearn", output_dir
     )
-
-
-if __name__ == "__main__":
-    load_and_run()

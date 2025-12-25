@@ -29,7 +29,7 @@ def main():
     parser.add_argument(
         "--pattern",
         default="",
-        help="Optional substring filter (e.g. 'Class', 'Regression', 'set_1')",
+        help="Optional substring filter (e.g. 'class', 'regression', 'set_1')",
     )
     args = parser.parse_args()
 
