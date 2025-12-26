@@ -1,36 +1,35 @@
 import time
 import warnings
-import numpy as np
-import pandas as pd
 from pathlib import Path
 
-from sklearn.base import clone
+import numpy as np
+import pandas as pd
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (
     OneHotEncoder,
     OrdinalEncoder,
     StandardScaler,
 )
+from sklearn.datasets import fetch_openml, fetch_california_housing
 
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 
-from sklearn.datasets import fetch_openml, fetch_california_housing
-
 from smart_knn import SmartKNN
 
-warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore")
 
 SEED = 42
 TEST_SIZE = 0.2
 LAT_RUNS = 500
 WARMUP_RUNS = 50
-ROW_OHE_THRESHOLD = 100
+
+np.random.seed(SEED)
 
 
 def regression_metrics(y_true, y_pred):
@@ -43,172 +42,129 @@ def measure_single_latency(fn, x, runs=LAT_RUNS):
     for _ in range(WARMUP_RUNS):
         fn(x)
 
-    times = []
-    for _ in range(runs):
+    times = np.empty(runs, dtype=np.float64)
+    for i in range(runs):
         t0 = time.perf_counter()
         fn(x)
-        times.append((time.perf_counter() - t0) * 1000)
+        times[i] = (time.perf_counter() - t0) * 1000.0
 
     return np.median(times), np.percentile(times, 95)
 
 
+def safe_target(df, target_col):
+    X = df.drop(columns=[target_col])
+    y = pd.to_numeric(df[target_col], errors="raise").values.astype(np.float32)
+    return X, y
+
+
 def build_preprocessor(df):
-    num_cols = df.select_dtypes(include=["number"]).columns
-    cat_cols = df.select_dtypes(exclude=["number"]).columns
+    num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+    cat_cols = df.select_dtypes(exclude=["number"]).columns.tolist()
 
-    if len(df) < ROW_OHE_THRESHOLD:
-        encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
-        enc_type = "onehot"
-    else:
-        encoder = OrdinalEncoder(
-            handle_unknown="use_encoded_value",
-            unknown_value=-1,
-        )
-        enc_type = "ordinal"
+    # version-safe OHE
+    try:
+        ohe = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+    except TypeError:
+        ohe = OneHotEncoder(handle_unknown="ignore", sparse=False)
 
-    print(
-        f"[INFO] Encoding={enc_type} | rows={len(df)} | cat_cols={len(cat_cols)}"
-    )
+    print(f"[INFO] rows={len(df)} | num={len(num_cols)} | cat={len(cat_cols)}")
 
     return ColumnTransformer(
-        [
+        transformers=[
             ("num", "passthrough", num_cols),
-            ("cat", encoder, cat_cols),
-        ]
+            ("cat", ohe, cat_cols),
+        ],
+        remainder="drop",
     )
-
-
-def safe_target(df, target_col):
-    if target_col in df.columns:
-        y = df[target_col]
-        X = df.drop(columns=[target_col])
-    else:
-        y = df.iloc[:, -1]
-        X = df.iloc[:, :-1]
-
-    if y.dtype == object:
-        y = pd.to_numeric(y.astype(str), errors="coerce")
-
-    y = y.values.astype(np.float32)
-
-    if np.any(np.isnan(y)):
-        raise ValueError("Target contains NaNs after conversion.")
-
-    return X, y
 
 
 def benchmark_regression(df, target_col, dataset_name, output_dir):
     X, y = safe_target(df, target_col)
-    preprocessor = build_preprocessor(X)
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=SEED
     )
 
-    X_train_enc = preprocessor.fit_transform(X_train)
-    X_test_enc = preprocessor.transform(X_test)
-    x_single = X_test_enc[[0]]
+    pre = build_preprocessor(X_train)
+
+    X_train_enc = pre.fit_transform(X_train)
+    X_test_enc = pre.transform(X_test)
+    x_single = X_test_enc[:1]
+
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train_enc)
+    X_test_scaled = scaler.transform(X_test_enc)
+    x_single_scaled = scaler.transform(x_single)
 
     models = {
-        "KNN": {
-            "pipeline": Pipeline([
-                ("prep", preprocessor),
-                ("scale", StandardScaler()),
-                ("model", KNeighborsRegressor(n_neighbors=5)),
-            ]),
-            "core": Pipeline([
-                ("scale", StandardScaler()),
-                ("model", KNeighborsRegressor(n_neighbors=5)),
-            ]),
-            "needs_scaling": True,
-        },
-        "Linear": {
-            "pipeline": Pipeline([
-                ("prep", preprocessor),
-                ("scale", StandardScaler()),
-                ("model", LinearRegression()),
-            ]),
-            "core": Pipeline([
-                ("scale", StandardScaler()),
-                ("model", LinearRegression()),
-            ]),
-            "needs_scaling": True,
-        },
-        "DecisionTree": {
-            "pipeline": Pipeline([
-                ("prep", preprocessor),
-                ("model", DecisionTreeRegressor(random_state=SEED)),
-            ]),
-            "core": DecisionTreeRegressor(random_state=SEED),
-            "needs_scaling": False,
-        },
-        "RandomForest": {
-            "pipeline": Pipeline([
-                ("prep", preprocessor),
-                ("model", RandomForestRegressor(
-                    n_estimators=200,
-                    random_state=SEED,
-                    n_jobs=1,
-                )),
-            ]),
-            "core": RandomForestRegressor(
-                n_estimators=200,
-                random_state=SEED,
-                n_jobs=1,
-            ),
-            "needs_scaling": False,
-        },
+        "KNN": KNeighborsRegressor(n_neighbors=5),
+        "Linear": LinearRegression(),
+        "DecisionTree": DecisionTreeRegressor(random_state=SEED),
+        "RandomForest": RandomForestRegressor(
+            n_estimators=200,
+            random_state=SEED,
+            n_jobs=1,
+        ),
     }
 
     rows = []
 
-    for name_m, cfg in models.items():
-        pipe = clone(cfg["pipeline"])
+
+    for name, model in models.items():
+        Xtr = X_train_scaled if name in ("KNN", "Linear") else X_train_enc
+        Xte = X_test_scaled if name in ("KNN", "Linear") else X_test_enc
+        xs = x_single_scaled if name in ("KNN", "Linear") else x_single
 
         t0 = time.perf_counter()
-        pipe.fit(X_train, y_train)
+        model.fit(Xtr, y_train)
         train_t = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        preds = pipe.predict(X_test)
+        preds = model.predict(Xte)
         batch_t = time.perf_counter() - t0
 
         rmse, r2 = regression_metrics(y_test, preds)
+        med, p95 = measure_single_latency(model.predict, xs)
 
-        if cfg["needs_scaling"]:
-            scaler = StandardScaler().fit(X_train_enc)
-            Xtr = scaler.transform(X_train_enc)
-            Xte = scaler.transform(x_single)
-            core = clone(cfg["core"])
-            core.fit(Xtr, y_train)
-            med, p95 = measure_single_latency(core.predict, Xte)
-        else:
-            core = clone(cfg["core"])
-            core.fit(X_train_enc, y_train)
-            med, p95 = measure_single_latency(core.predict, x_single)
+        rows.append([name, rmse, r2, train_t, batch_t, med, p95])
 
-        rows.append([name_m, rmse, r2, train_t, batch_t, med, p95])
 
     best = None
     for wt in (0.0, 0.1):
         knn = SmartKNN(k=5, backend="auto", weight_threshold=wt)
 
         t0 = time.perf_counter()
-        knn.fit(X_train_enc, y_train)
+        knn.fit(X_train_scaled, y_train)
         train_t = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        preds = knn.predict(X_test_enc)
+        preds = knn.predict(X_test_scaled)
         batch_t = time.perf_counter() - t0
 
         rmse, r2 = regression_metrics(y_test, preds)
-        med, p95 = measure_single_latency(knn.predict, x_single)
+        med, p95 = measure_single_latency(knn.predict, x_single_scaled)
 
-        cand = ["SmartKNN", rmse, r2, train_t, batch_t, med, p95, wt]
-        if best is None or r2 > best[2]:
-            best = cand
+        if best is None or r2 > best["r2"]:
+            best = dict(
+                wt=wt,
+                rmse=rmse,
+                r2=r2,
+                train=train_t,
+                batch=batch_t,
+                med=med,
+                p95=p95,
+            )
 
-    rows.append(best[:-1])
+    rows.append([
+        f"SmartKNN (wt={best['wt']})",
+        best["rmse"],
+        best["r2"],
+        best["train"],
+        best["batch"],
+        best["med"],
+        best["p95"],
+    ])
 
     df_out = pd.DataFrame(
         rows,
@@ -223,12 +179,13 @@ def benchmark_regression(df, target_col, dataset_name, output_dir):
         ],
     )
 
-    out = Path(output_dir) / f"{dataset_name.replace(' ', '_').lower()}.csv"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out = output_dir / f"{dataset_name}.csv"
     df_out.to_csv(out, index=False)
     print(f"[SAVED] {out}")
 
 
-def run(output_dir):
+def run(output_dir="benchmarks/results"):
     output_dir = Path(output_dir)
 
     cal = fetch_california_housing(as_frame=True)
@@ -245,3 +202,7 @@ def run(output_dir):
     benchmark_regression(
         kc.frame, "price", "house_sales_king_county", output_dir
     )
+
+
+if __name__ == "__main__":
+    run()
