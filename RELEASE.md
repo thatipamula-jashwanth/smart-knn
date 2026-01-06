@@ -2,6 +2,18 @@
 
 ---
 
+## Release 0.2.1 - **SmartKNN v2.1**
+
+This release focuses on **stability, proper dependencies, and runtime safety**, fixing scaling issues and ensuring seamless installation.
+
+### Major Changes
+- Fixed **scaling bugs** in large datasets and ultra-low latency inference
+- Added **dependencies** to prevent runtime errors
+- Full **classification and regression support**
+- Optimized internal workflows for memory and speed
+
+---
+
 ## Release 0.2.0 - **SmartKNN v2**
 
 This release marks a **major milestone** for SmartKNN, introducing a fully optimized

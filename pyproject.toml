@@ -19,7 +19,8 @@ dependencies = [
   "numpy>=1.22",
   "scikit-learn>=1.2",
   "joblib>=1.2",
-  "numba>=0.60"
+  "numba>=0.60",
+  "faiss-cpu>=1.8.0"
 ]
 
 keywords = [
