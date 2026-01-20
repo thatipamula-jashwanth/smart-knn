@@ -72,7 +72,6 @@ class SmartKNN:
         self.fitted = False
         self._lock = threading.Lock()
 
-
     def __sklearn_is_fitted__(self):
         return getattr(self, "fitted", False)
 
@@ -97,7 +96,6 @@ class SmartKNN:
             else:
                 setattr(self, key, value)
         return self
-
 
     def _validate_schema_array(self, X, y=None):
         X = np.asarray(X)
@@ -165,8 +163,12 @@ class SmartKNN:
 
             backend_logger = logger.getChild("Backend")
 
-            if self.backend_mode == "brute" or not ANN_AVAILABLE:
-                backend_logger.info("Using BRUTE backend.")
+            MIN_SAMPLES_FOR_ANN = 10_000  
+
+            if self.backend_mode == "brute" or not ANN_AVAILABLE or self.X_.shape[0] < MIN_SAMPLES_FOR_ANN:
+                backend_logger.info(
+                    f"Using BRUTE backend (samples={self.X_.shape[0]} — SMALL DATASET OR ANN UNAVAILABLE)."
+                )
                 self.backend = BruteBackend(self.X_, self.weights_)
             else:
                 self.backend = AnnBackend(self.X_, use_gpu=self.use_gpu)
@@ -179,9 +181,7 @@ class SmartKNN:
                         )
                         self.backend = BruteBackend(self.X_, self.weights_)
                     else:
-                        backend_logger.info(
-                            f"ANN quality passed (R²={r2:.3f})."
-                        )
+                        backend_logger.info(f"ANN quality passed (R²={r2:.3f}).")
 
             self.fitted = True
 
@@ -241,4 +241,3 @@ class SmartKNN:
         for key, value in state.items():
             setattr(self, key, value)
         self._lock = threading.Lock()
-

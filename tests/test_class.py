@@ -9,7 +9,6 @@ def test_classification_basic_binary():
 
     X = np.random.rand(200, 4).astype(np.float32)
 
-    # Clear separable signal
     y = (X[:, 0] + X[:, 1] > 1.0).astype(int)
 
     model = SmartKNN(k=5)
@@ -65,11 +64,7 @@ def test_force_classification_overrides_regression():
 
 
 def test_classification_nan_inf_query_raises():
-    """
-    SmartKNN v2 CONTRACT:
-    - Training data may contain NaN/Inf (sanitized)
-    - Query data must be finite when ANN backend is used
-    """
+
     X = np.array(
         [
             [1.0, np.nan, 0.2],
