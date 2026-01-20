@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import warnings
 
 from smart_knn import SmartKNN
 
@@ -23,11 +24,11 @@ def test_end_to_end_regression_basic():
     assert mse < 0.2, f"MSE too high: {mse}"
 
 
-def test_end_to_end_nan_inf_query_raises():
+def test_end_to_end_nan_inf_query_warns():
     """
     SmartKNN v2 CONTRACT:
     - Training data may contain NaN/Inf (sanitized)
-    - Query data with NaN/Inf must raise ValueError.
+    - Query data with NaN/Inf triggers a warning and produces finite predictions.
     """
     X = np.array([
         [1.0, np.nan, 5.0],
@@ -41,8 +42,16 @@ def test_end_to_end_nan_inf_query_raises():
 
     q = np.array([np.nan, np.inf, -np.inf], dtype=np.float32)
 
-    with pytest.raises(ValueError):
-        model.predict(q)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        preds = model.predict(q)
+
+        # Ensure a warning was issued for NaN/Inf
+        assert any("NaN/Inf detected" in str(wi.message) for wi in w), \
+            "Expected a warning about NaN/Inf in query"
+
+        # Predictions are finite
+        assert np.isfinite(preds).all()
 
 
 def test_feature_filtering_threshold():

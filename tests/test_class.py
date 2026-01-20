@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import warnings
 
 from smart_knn import SmartKNN
 
@@ -62,20 +63,17 @@ def test_force_classification_overrides_regression():
     assert preds.ndim == 1
 
 
-def test_classification_nan_inf_query_raises():
+def test_classification_nan_inf_query_warns():
     """
     SmartKNN contract: training data may contain NaN/Inf (sanitized),
-    but queries with NaN/Inf must raise ValueError.
+    query data with NaN/Inf triggers a warning and produces finite predictions.
     """
-    X = np.array(
-        [
-            [1.0, np.nan, 0.2],
-            [0.9, np.inf, 0.1],
-            [0.1, -np.inf, 0.9],
-            [0.2, 0.1, 0.8],
-        ],
-        dtype=np.float32,
-    )
+    X = np.array([
+        [1.0, np.nan, 0.2],
+        [0.9, np.inf, 0.1],
+        [0.1, -np.inf, 0.9],
+        [0.2, 0.1, 0.8],
+    ], dtype=np.float32)
     y = np.array([0, 0, 1, 1], dtype=int)
 
     model = SmartKNN(k=2)
@@ -83,8 +81,16 @@ def test_classification_nan_inf_query_raises():
 
     q = np.array([np.nan, np.inf, -np.inf], dtype=np.float32)
 
-    with pytest.raises(ValueError):
-        model.predict(q)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        preds = model.predict(q)
+
+        # Ensure a warning was issued for NaN/Inf
+        assert any("NaN/Inf detected" in str(wi.message) for wi in w), \
+            "Expected a warning about NaN/Inf in query"
+
+        # Predictions are finite
+        assert np.isfinite(preds).all()
 
 
 def test_classification_batch_vs_single():

@@ -1,5 +1,6 @@
 import logging
 import threading
+import warnings
 import numpy as np
 from sklearn.metrics import r2_score
 
@@ -163,9 +164,13 @@ class SmartKNN:
 
             backend_logger = logger.getChild("Backend")
 
-            MIN_SAMPLES_FOR_ANN = 10_000  
+            MIN_SAMPLES_FOR_ANN = 10_000
 
-            if self.backend_mode == "brute" or not ANN_AVAILABLE or self.X_.shape[0] < MIN_SAMPLES_FOR_ANN:
+            if (
+                self.backend_mode == "brute"
+                or not ANN_AVAILABLE
+                or self.X_.shape[0] < MIN_SAMPLES_FOR_ANN
+            ):
                 backend_logger.info(
                     f"Using BRUTE backend (samples={self.X_.shape[0]} — SMALL DATASET OR ANN UNAVAILABLE)."
                 )
@@ -192,7 +197,15 @@ class SmartKNN:
         if Xq.ndim == 1:
             Xq = Xq.reshape(1, -1)
 
-        Xq = np.nan_to_num(Xq, nan=self.mean_, posinf=self.mean_, neginf=self.mean_)
+        if not np.isfinite(Xq).all():
+            warnings.warn(
+                "NaN/Inf detected in query — APPLYING SAFE NORMALIZATION.",
+                RuntimeWarning,
+            )
+
+        Xq = np.nan_to_num(
+            Xq, nan=self.mean_, posinf=self.mean_, neginf=self.mean_
+        )
 
         Xq = (Xq - self.mean_) / np.maximum(self.std_, 1e-12)
         Q = Xq[:, self.feature_mask_]
@@ -210,7 +223,6 @@ class SmartKNN:
         )
 
     def predict(self, X):
-
         if not getattr(self, "fitted", False):
             raise RuntimeError("SmartKNN instance is not fitted yet.")
 
@@ -231,10 +243,10 @@ class SmartKNN:
             return classes[np.argmax(scores, axis=1)]
 
         return np.sum(y_neighbors * w, axis=1) / np.sum(w, axis=1)
-    
+
     def __getstate__(self):
         state = {slot: getattr(self, slot, None) for slot in self.__slots__}
-        state["_lock"] = None  
+        state["_lock"] = None
         return state
 
     def __setstate__(self, state):
