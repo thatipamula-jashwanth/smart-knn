@@ -203,7 +203,6 @@ def run(output_dir="benchmarks/results"):
         ("adult", "class", "adult_income"),
     ]
 
-    #Add datasets as needed
     for name, target, out_name in datasets:
         print(f"\n[DATASET] {name}")
         ds = fetch_openml(name=name, as_frame=True, parser="auto")

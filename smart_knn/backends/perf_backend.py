@@ -7,7 +7,7 @@ try:
 except Exception:
     FAISS_AVAILABLE = False
 
-logger = logging.getLogger("smartknn.annbackend")
+logger = logging.getLogger("Smartknn.Annbackend")
 if not logger.handlers:
     handler = logging.StreamHandler()
     fmt = logging.Formatter("%(asctime)s | %(levelname)s | SmartKNN.ANN | %(message)s")
@@ -40,22 +40,29 @@ class AnnBackend:
         self.use_gpu = bool(use_gpu)
         self.use_ivf = bool(use_ivf)
 
-        # Auto-scale nlist
         if self.use_ivf:
-            max_nlist = max(1, n // 40)
-            self.nlist = max_nlist if nlist is None else min(int(nlist), max_nlist)
+            if nlist is None:
+                if n <= 1_000_000:
+                    self.nlist = min(2048, max(64, n // 40))
+                else:
+                    if n <= 5_000_000:
+                        self.nlist = 512
+                    else:
+                        self.nlist = 256
+            else:
+                self.nlist = int(nlist)
         else:
             self.nlist = 1
 
-        # Auto-set nprobe
+
         if nprobe is None:
             self.nprobe = min(8, max(1, self.nlist // 10))
         else:
             self.nprobe = int(nprobe)
+
         if self.use_ivf:
             self.nprobe = min(max(1, self.nprobe), self.nlist)
 
-        # Build index
         quantizer = faiss.IndexFlatL2(d)
         if self.use_ivf:
             index = faiss.IndexIVFFlat(quantizer, d, self.nlist)
@@ -73,7 +80,6 @@ class AnnBackend:
             if not silent:
                 logger.info("FlatL2 index ready (exact search)")
 
-        # GPU handling
         if self.use_gpu:
             try:
                 res = faiss.StandardGpuResources()

@@ -192,6 +192,8 @@ class SmartKNN:
         if Xq.ndim == 1:
             Xq = Xq.reshape(1, -1)
 
+        Xq = np.nan_to_num(Xq, nan=self.mean_, posinf=self.mean_, neginf=self.mean_)
+
         Xq = (Xq - self.mean_) / np.maximum(self.std_, 1e-12)
         Q = Xq[:, self.feature_mask_]
 

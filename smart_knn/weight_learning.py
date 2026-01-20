@@ -1,6 +1,13 @@
 import numpy as np
 from sklearn.ensemble import ExtraTreesRegressor
 
+try:
+    from joblib import Parallel, delayed
+    _HAS_JOBLIB = True
+except Exception:
+    _HAS_JOBLIB = False
+
+
 def _safe_normalize(w, eps=1e-8):
     w = np.asarray(w, dtype=np.float32)
     w = np.nan_to_num(w, nan=0.0, posinf=0.0, neginf=0.0)
@@ -49,24 +56,48 @@ def _fast_mi_weights(X, y, bins=32, eps=1e-8):
     else:
         Xs, ys = X, y
 
-    edges = np.percentile(ys, np.linspace(0, 100, bins + 1))
-    yb = np.digitize(ys, edges) - 1
+    # -------- SAFE DIGITIZATION --------
+    def _digitize_safe(x, edges):
+        # edges has length bins + 1
+        # use interior edges only
+        xb = np.searchsorted(edges[1:-1], x, side="right")
+        return np.clip(xb, 0, bins - 1)
 
-    mi = np.zeros(X.shape[1], dtype=np.float32)
-    for j in range(X.shape[1]):
+    # Target bins
+    y_edges = np.percentile(ys, np.linspace(0, 100, bins + 1))
+    yb = _digitize_safe(ys, y_edges)
+
+    # Feature bin edges
+    feature_edges = [
+        np.percentile(Xs[:, j], np.linspace(0, 100, bins + 1))
+        for j in range(Xs.shape[1])
+    ]
+
+    def _mi_single_feature(j):
         x = Xs[:, j]
-        edges = np.percentile(x, np.linspace(0, 100, bins + 1))
-        xb = np.digitize(x, edges) - 1
+        xb = _digitize_safe(x, feature_edges[j])
 
-    
-        joint = np.histogram2d(xb, yb, bins=bins)[0]
+        joint = np.zeros((bins, bins), dtype=np.float32)
+        np.add.at(joint, (xb, yb), 1)
+
         pxy = joint / np.sum(joint)
         px = np.sum(pxy, axis=1, keepdims=True)
         py = np.sum(pxy, axis=0, keepdims=True)
 
-        with np.errstate(divide='ignore', invalid='ignore'):
-            log_term = np.log((pxy + eps) / (px @ py + eps))
-            mi[j] = np.sum(pxy * log_term)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.sum(pxy * np.log((pxy + eps) / (px @ py + eps)))
+
+    use_parallel = _HAS_JOBLIB and Xs.shape[1] >= 100
+
+    if use_parallel:
+        mi = Parallel(n_jobs=-1, prefer="processes")(
+            delayed(_mi_single_feature)(j) for j in range(Xs.shape[1])
+        )
+        mi = np.asarray(mi, dtype=np.float32)
+    else:
+        mi = np.zeros(Xs.shape[1], dtype=np.float32)
+        for j in range(Xs.shape[1]):
+            mi[j] = _mi_single_feature(j)
 
     return _safe_normalize(mi + eps, eps)
 
@@ -86,6 +117,7 @@ def _fast_rf_weights(X, y, n_estimators=200, eps=1e-8):
         rf = ExtraTreesRegressor(
             n_estimators=n_estimators,
             max_features="sqrt",
+            min_samples_leaf=5,
             bootstrap=False,
             random_state=42,
             n_jobs=-1
