@@ -8,7 +8,6 @@ def test_classification_basic_binary():
     np.random.seed(42)
 
     X = np.random.rand(200, 4).astype(np.float32)
-
     y = (X[:, 0] + X[:, 1] > 1.0).astype(int)
 
     model = SmartKNN(k=5)
@@ -64,7 +63,10 @@ def test_force_classification_overrides_regression():
 
 
 def test_classification_nan_inf_query_raises():
-
+    """
+    SmartKNN contract: training data may contain NaN/Inf (sanitized),
+    but queries with NaN/Inf must raise ValueError.
+    """
     X = np.array(
         [
             [1.0, np.nan, 0.2],

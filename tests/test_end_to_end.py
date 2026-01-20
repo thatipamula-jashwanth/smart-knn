@@ -27,16 +27,13 @@ def test_end_to_end_nan_inf_query_raises():
     """
     SmartKNN v2 CONTRACT:
     - Training data may contain NaN/Inf (sanitized)
-    - Query data must be finite (ANN backend requirement)
+    - Query data with NaN/Inf must raise ValueError.
     """
-    X = np.array(
-        [
-            [1.0, np.nan, 5.0],
-            [2.0, np.inf, 6.0],
-            [3.0, -np.inf, 7.0],
-        ],
-        dtype=np.float32,
-    )
+    X = np.array([
+        [1.0, np.nan, 5.0],
+        [2.0, np.inf, 6.0],
+        [3.0, -np.inf, 7.0],
+    ], dtype=np.float32)
     y = np.array([10.0, 20.0, 30.0], dtype=np.float32)
 
     model = SmartKNN(k=2)
