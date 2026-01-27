@@ -34,6 +34,7 @@ class SmartKNN:
         "force_classification",
         "backend_mode", "use_gpu",
         "ann_quality_check", "ann_min_r2",
+        "ann_nlist", "ann_nprobe",
         "_lock", "fitted",
         "mean_", "std_",
         "feature_mask_", "X_", "weights_", "y_",
@@ -52,10 +53,12 @@ class SmartKNN:
         backend="auto",
         use_gpu=False,
         ann_quality_check=True,
-        ann_min_r2=0.0
+        ann_min_r2=0.0,
+        ann_nlist=None,
+        ann_nprobe=None
     ):
         if backend not in ("auto", "brute", "ann"):
-            raise ValueError("backend must be 'auto', 'brute', or 'ann'")
+            raise ValueError("Backend must be 'auto', 'brute', or 'ann'")
 
         self.k = int(k)
         self.weight_threshold = float(weight_threshold)
@@ -69,6 +72,9 @@ class SmartKNN:
 
         self.ann_quality_check = bool(ann_quality_check)
         self.ann_min_r2 = float(ann_min_r2)
+
+        self.ann_nlist = ann_nlist
+        self.ann_nprobe = ann_nprobe
 
         self.fitted = False
         self._lock = threading.Lock()
@@ -88,6 +94,8 @@ class SmartKNN:
             "use_gpu": self.use_gpu,
             "ann_quality_check": self.ann_quality_check,
             "ann_min_r2": self.ann_min_r2,
+            "ann_nlist": self.ann_nlist,
+            "ann_nprobe": self.ann_nprobe,
         }
 
     def set_params(self, **params):
@@ -103,7 +111,7 @@ class SmartKNN:
         if X.ndim != 2:
             raise ValueError("X must be 2D.")
         if not np.isfinite(X).all():
-            logger.warning("NaN/Inf detected in X — applying safe normalization.")
+            logger.warning("NaN/Inf Detected in X - Applying Safe Normalization.")
         if y is not None and not np.isfinite(y).all():
             raise ValueError("y contains NaN/Inf.")
 
@@ -115,6 +123,7 @@ class SmartKNN:
         return len(np.unique(y)) <= min(50, int(np.sqrt(len(y))))
 
     def _validate_ann_regression(self, max_samples=1024):
+       
         X_full, y_full = self.X_, self.y_
         n = X_full.shape[0]
 
@@ -125,7 +134,13 @@ class SmartKNN:
         else:
             X, y = X_full, y_full
 
-        ann = AnnBackend(X, use_gpu=False, silent=True)
+        ann = AnnBackend(
+            X,
+            use_ivf=False,
+            use_gpu=False,
+            silent=True
+        )
+
         idx_mat, dist_mat = ann.kneighbors_batch(X, self.k)
 
         w = 1.0 / np.maximum(dist_mat, 1e-9)
@@ -163,7 +178,6 @@ class SmartKNN:
             self.classes_ = np.unique(y) if self.is_classification_ else None
 
             backend_logger = logger.getChild("Backend")
-
             MIN_SAMPLES_FOR_ANN = 10_000
 
             if (
@@ -172,21 +186,30 @@ class SmartKNN:
                 or self.X_.shape[0] < MIN_SAMPLES_FOR_ANN
             ):
                 backend_logger.info(
-                    f"Using BRUTE backend (samples={self.X_.shape[0]} — SMALL DATASET OR ANN UNAVAILABLE)."
+                    f"Using BRUTE Backend (samples={self.X_.shape[0]} — SMALL DATASET OR ANN UNAVAILABLE)."
                 )
                 self.backend = BruteBackend(self.X_, self.weights_)
             else:
-                self.backend = AnnBackend(self.X_, use_gpu=self.use_gpu)
+                self.backend = AnnBackend(
+                    self.X_,
+                    nlist=self.ann_nlist,
+                    nprobe=self.ann_nprobe,
+                    use_gpu=self.use_gpu
+                )
+
+                backend_logger.info(
+                    f"ANN | nlist={self.backend.nlist} | nprobe={self.backend.nprobe}"
+                )
 
                 if self.ann_quality_check and not self.is_classification_:
                     r2 = self._validate_ann_regression()
                     if r2 < self.ann_min_r2:
                         backend_logger.warning(
-                            f"ANN quality failed (R²={r2:.3f}) — switching to BRUTE."
+                            f"ANN Quality Failed (R²={r2:.3f}) — switching to BRUTE."
                         )
                         self.backend = BruteBackend(self.X_, self.weights_)
                     else:
-                        backend_logger.info(f"ANN quality passed (R²={r2:.3f}).")
+                        backend_logger.info(f"ANN Quality (R²={r2:.3f}).")
 
             self.fitted = True
 
@@ -199,7 +222,7 @@ class SmartKNN:
 
         if not np.isfinite(Xq).all():
             warnings.warn(
-                "NaN/Inf detected in query — APPLYING SAFE NORMALIZATION.",
+                "NaN/Inf Detected in Query — APPLYING SAFE NORMALIZATION.",
                 RuntimeWarning,
             )
 
@@ -225,8 +248,17 @@ class SmartKNN:
     def predict(self, X):
         if not getattr(self, "fitted", False):
             raise RuntimeError("SmartKNN instance is not fitted yet.")
+        
+        Xq = np.asarray(X, dtype=np.float32)
 
-        idx, dist = self._kneighbors_batch(X)
+        if not np.isfinite(Xq).all():
+            warnings.warn(
+                "NaN/Inf Detected in Query — Applying Safe Normalization.",
+                RuntimeWarning,
+            )
+
+
+        idx, dist = self._kneighbors_batch(Xq)
 
         w = 1.0 / np.maximum(dist, 1e-9)
         y_neighbors = self.y_[idx]

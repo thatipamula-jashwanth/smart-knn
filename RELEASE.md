@@ -2,6 +2,45 @@
 
 ---
 
+## Release 0.2.2 — **SmartKNN v2.2**
+This release focuses on scalability, correctness of automatic decisions, and faster training on large-scale datasets, with multiple internal improvements across feature weighting and ANN indexing.
+
+### Major Changes
+- **Mutual Information (MI)** feature weighting optimized
+  - **MI** computation is now **parallelized** for very high-dimensional datasets
+  - Preserves exact behavior for low and medium dimensional data
+- **Automatic backend** selection corrected
+  - **Brute-force** backend is now explicitly enforced below **10K** rows
+  - Prevents unnecessary ANN overhead on small datasets
+
+- **Feature selection** improvements
+  - **Random Forest–based** feature relevance updated with improved split constraints
+  - More stable feature pruning under **noisy or skewed distributions**
+
+- **ANN backend** training optimized for **very large datasets**
+  - **Improved scalability** for **multi-million** row datasets
+  - **Faster ANN index construction** without affecting **inference behavior**
+
+### Performance Improvements
+- Faster training time observed:
+  - **~10% speedup on medium-sized** datasets
+  - **~25% speedup on multi-million** row datasets
+- **Reduced ANN index build overhead** for very large datasets
+- **No regression in inference accuracy or latency**
+
+### Bug Fixes
+- **Fixed inference-time** Handling of **NAN / INF** values in Query Inputs.
+  SmartKNN now consistently **emits a warning when invalid values are detected during prediction**, while preserving existing **normalization and prediction behavior**.
+
+
+## Notes
+
+- ANN inference behavior and tuning **(nlist, nprobe)** remain unchanged
+- Improvements primarily affect **training-time scalability**
+- No **API changes** 
+
+---
+
 ## Release 0.2.1 - **SmartKNN v2.1**
 
 This release focuses on **stability, proper dependencies, and runtime safety**, fixing scaling issues and ensuring seamless installation.

@@ -56,18 +56,14 @@ def _fast_mi_weights(X, y, bins=32, eps=1e-8):
     else:
         Xs, ys = X, y
 
-    # -------- SAFE DIGITIZATION --------
+
     def _digitize_safe(x, edges):
-        # edges has length bins + 1
-        # use interior edges only
         xb = np.searchsorted(edges[1:-1], x, side="right")
         return np.clip(xb, 0, bins - 1)
 
-    # Target bins
     y_edges = np.percentile(ys, np.linspace(0, 100, bins + 1))
     yb = _digitize_safe(ys, y_edges)
 
-    # Feature bin edges
     feature_edges = [
         np.percentile(Xs[:, j], np.linspace(0, 100, bins + 1))
         for j in range(Xs.shape[1])

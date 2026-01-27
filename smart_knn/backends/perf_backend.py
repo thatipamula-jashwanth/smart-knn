@@ -43,7 +43,7 @@ class AnnBackend:
         if self.use_ivf:
             if nlist is None:
                 if n <= 1_000_000:
-                    self.nlist = min(2048, max(64, n // 40))
+                    self.nlist = min(2048, max(64, n // 50))
                 else:
                     if n <= 5_000_000:
                         self.nlist = 512
@@ -72,8 +72,7 @@ class AnnBackend:
             index.add(X)
             index.nprobe = self.nprobe
             if not silent:
-                logger.info(f"IVF index ready | nlist={self.nlist} | nprobe={index.nprobe}")
-                logger.warning("ANN recall depends on nlist/nprobe — tune for your dataset")
+                logger.info(f"IVF INDUX BUILT")
         else:
             index = faiss.IndexFlatL2(d)
             index.add(X)
@@ -96,7 +95,7 @@ class AnnBackend:
             logger.debug("ANN recall validated.")
         else:
             logger.info(
-                f"ANN backend ready | samples={n} | features={d} | ivf={self.use_ivf} | gpu={self.use_gpu}"
+                f"Samples={n} | Features={d} | Gpu={self.use_gpu}"
             )
 
     def set_nprobe(self, nprobe):
