@@ -25,11 +25,7 @@ def test_end_to_end_regression_basic():
 
 
 def test_end_to_end_nan_inf_query_warns():
-    """
-    SmartKNN v2 CONTRACT:
-    - Training data may contain NaN/Inf (sanitized)
-    - Query data with NaN/Inf triggers a warning and produces finite predictions.
-    """
+    
     X = np.array([
         [1.0, np.nan, 5.0],
         [2.0, np.inf, 6.0],

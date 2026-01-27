@@ -253,7 +253,7 @@ class SmartKNN:
 
         if not np.isfinite(Xq).all():
             warnings.warn(
-                "NaN/Inf Detected in Query — Applying Safe Normalization.",
+                "NaN/Inf detected in query - applying safe normalization.",
                 RuntimeWarning,
             )
 
