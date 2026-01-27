@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-knn"
-version = "0.2.1"
+version = "0.2.2"
 description = "A modern, weighted k-nearest neighbors algorithm with learned feature importance and fast CPU inference."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -18,9 +18,9 @@ authors = [
 dependencies = [
   "numpy>=1.22",
   "scikit-learn>=1.2",
+    "faiss-cpu>=1.8.0",
   "joblib>=1.2",
-  "numba>=0.60",
-  "faiss-cpu>=1.8.0"
+  "numba>=0.60"
 ]
 
 keywords = [
