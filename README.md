@@ -25,7 +25,7 @@ A modern, weighted nearest-neighbor learning algorithm with learned feature impo
     <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License"/>
   </a>
   <a href="https://huggingface.co/spaces/JashuXo/smart-knn">
-  <img src="https://img.shields.io/badge/🤗%20HuggingFace-Demo-yellow?style=flat-square" alt="Hugging Face Demo"/>
+  <img src="https://img.shields.io/badge/HuggingFace-Demo-yellow?style=flat-square" alt="Hugging Face Demo"/>
 </a>
 </p>
 
