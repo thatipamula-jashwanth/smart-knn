@@ -24,6 +24,9 @@ A modern, weighted nearest-neighbor learning algorithm with learned feature impo
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License"/>
   </a>
+  <a href="https://huggingface.co/spaces/JashuXo/smart-knn">
+    <img src="https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-sm.svg" alt="Hugging Face Space"/>
+  </a>
 </p>
 
 ## Overview
