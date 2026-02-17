@@ -77,17 +77,31 @@ def _weighted_l2_batch(X, q, w):
 def _weighted_l2_multiquery(X, Q, w):
     nq, d = Q.shape
     nx = X.shape[0]
+
     out = np.empty((nq, nx), dtype=np.float32)
 
-    for i in prange(nq):
-        for j in range(nx):
-            s = 0.0
-            for k in range(d):
-                diff = X[j, k] - Q[i, k]
-                s += diff * diff * w[k]
-            out[i, j] = np.sqrt(s)
+    block = 4096
+    n_blocks = (nx + block - 1) // block
+
+    for bi in prange(n_blocks):
+        start = bi * block
+        end = min(start + block, nx)
+
+        for qi in range(nq):
+            q = Q[qi]
+
+            for xi in range(start, end):
+                s = 0.0
+                row = X[xi]
+
+                for k in range(d):
+                    diff = row[k] - q[k]
+                    s += diff * diff * w[k]
+
+                out[qi, xi] = np.sqrt(s)
 
     return out
+
 
 
 def weighted_euclidean(a, b, weights, eps=1e-8):
