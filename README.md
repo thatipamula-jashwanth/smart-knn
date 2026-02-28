@@ -27,6 +27,7 @@ A modern, weighted nearest-neighbor learning algorithm with learned feature impo
   <a href="https://huggingface.co/spaces/JashuXo/smart-knn">
   <img src="https://img.shields.io/badge/HuggingFace-Demo-yellow?style=flat-square" alt="Hugging Face Demo"/>
 </a>
+  <a> [![PyPI Downloads](https://static.pepy.tech/personalized-badge/smart-knn?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=RED&left_text=downloads)](https://pepy.tech/projects/smart-knn)</a>
 </p>
 
 ## Overview
