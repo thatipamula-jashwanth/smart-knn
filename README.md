@@ -28,8 +28,12 @@ A modern, weighted nearest-neighbor learning algorithm with learned feature impo
   <img src="https://img.shields.io/badge/HuggingFace-Demo-yellow?style=flat-square" alt="Hugging Face Demo"/>
 </a>
   <a href="https://thatipamula-jashwanth.github.io/SmartEco/products/Benchmarks/Regression/">
-    <img src="https://img.shields.io/badge/Benchmarks-red?style=flat-square" alt="Benchmarks"/>
-  </a>
+  <img src="https://img.shields.io/badge/Benchmarks-Regression-lightgrey?style=flat-square" alt="Regression Benchmarks"/>
+</a>
+
+<a href="https://thatipamula-jashwanth.github.io/SmartEco/products/Benchmarks/Classification/">
+  <img src="https://img.shields.io/badge/Benchmarks-Classification-lightgrey?style=flat-square" alt="Classification Benchmarks"/>
+</a>
 </p>
 
 ## Overview
