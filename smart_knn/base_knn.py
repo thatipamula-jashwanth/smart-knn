@@ -15,6 +15,11 @@ try:
 except Exception:
     ANN_AVAILABLE = False
 
+from .smartknn_engine import (
+    _validate_ann_regression,
+    _kneighbors_batch
+)
+
 logger = logging.getLogger("SmartKNN")
 if not logger.handlers:
     handler = logging.StreamHandler()
@@ -122,33 +127,6 @@ class SmartKNN:
             return False
         return len(np.unique(y)) <= min(50, int(np.sqrt(len(y))))
 
-    def _validate_ann_regression(self, max_samples=1024):
-       
-        X_full, y_full = self.X_, self.y_
-        n = X_full.shape[0]
-
-        if n > max_samples:
-            sel = np.random.choice(n, max_samples, replace=False)
-            X = X_full[sel]
-            y = y_full[sel]
-        else:
-            X, y = X_full, y_full
-
-        ann = AnnBackend(
-            X,
-            use_ivf=False,
-            use_gpu=False,
-            silent=True
-        )
-
-        idx_mat, dist_mat = ann.kneighbors_batch(X, self.k)
-
-        w = 1.0 / np.maximum(dist_mat, 1e-9)
-        y_neighbors = y[idx_mat]
-        preds = np.sum(y_neighbors * w, axis=1) / np.sum(w, axis=1)
-
-        return r2_score(y, preds)
-
     def fit(self, X, y):
         self._validate_schema_array(X, y)
 
@@ -202,7 +180,7 @@ class SmartKNN:
                 )
 
                 if self.ann_quality_check and not self.is_classification_:
-                    r2 = self._validate_ann_regression()
+                    r2 = _validate_ann_regression(self)
                     if r2 < self.ann_min_r2:
                         backend_logger.warning(
                             f"ANN Quality Failed (R²={r2:.3f}) — switching to BRUTE."
@@ -215,40 +193,10 @@ class SmartKNN:
 
         return self
 
-    def _kneighbors_batch(self, Xq):
-        Xq = np.asarray(Xq, dtype=np.float32)
-        if Xq.ndim == 1:
-            Xq = Xq.reshape(1, -1)
-
-        if not np.isfinite(Xq).all():
-            warnings.warn(
-                "NaN/Inf Detected in Query — APPLYING SAFE NORMALIZATION.",
-                RuntimeWarning,
-            )
-
-        Xq = np.nan_to_num(
-            Xq, nan=self.mean_, posinf=self.mean_, neginf=self.mean_
-        )
-
-        Xq = (Xq - self.mean_) / np.maximum(self.std_, 1e-12)
-        Q = Xq[:, self.feature_mask_]
-
-        approx_idx, _ = self.backend.kneighbors_batch(Q, self.k * 5)
-
-        Xc = self.X_[approx_idx]
-        diff = Xc - Q[:, None, :]
-        dist = np.sqrt(np.sum((diff * diff) * self.weights_, axis=2))
-
-        top = np.argpartition(dist, self.k - 1, axis=1)[:, :self.k]
-        return (
-            np.take_along_axis(approx_idx, top, axis=1),
-            np.take_along_axis(dist, top, axis=1)
-        )
-
     def predict(self, X):
         if not getattr(self, "fitted", False):
             raise RuntimeError("SmartKNN instance is not fitted yet.")
-        
+
         Xq = np.asarray(X, dtype=np.float32)
 
         if not np.isfinite(Xq).all():
@@ -257,8 +205,7 @@ class SmartKNN:
                 RuntimeWarning,
             )
 
-
-        idx, dist = self._kneighbors_batch(Xq)
+        idx, dist = _kneighbors_batch(self, Xq)
 
         w = 1.0 / np.maximum(dist, 1e-9)
         y_neighbors = self.y_[idx]
@@ -275,6 +222,44 @@ class SmartKNN:
             return classes[np.argmax(scores, axis=1)]
 
         return np.sum(y_neighbors * w, axis=1) / np.sum(w, axis=1)
+
+    def predict_proba(self, X):
+        if not getattr(self, "fitted", False):
+            raise RuntimeError("SmartKNN instance is not fitted yet.")
+
+        if not self.is_classification_:
+            raise RuntimeError("predict_proba only available for classification.")
+
+        Xq = np.asarray(X, dtype=np.float32)
+
+        idx, dist = _kneighbors_batch(self, Xq)
+
+        w = 1.0 / np.maximum(dist, 1e-9)
+        y_neighbors = self.y_[idx]
+
+        classes = self.classes_
+        class_idx = np.searchsorted(classes, y_neighbors)
+
+        scores = np.zeros((idx.shape[0], len(classes)), dtype=np.float32)
+
+        np.add.at(
+            scores,
+            (np.repeat(np.arange(idx.shape[0]), self.k), class_idx.ravel()),
+            w.ravel()
+        )
+
+        scores_sum = np.sum(scores, axis=1, keepdims=True)
+        probs = scores / np.maximum(scores_sum, 1e-12)
+
+        return probs
+
+    def decision_function(self, X):
+        probs = self.predict_proba(X)
+
+        if probs.shape[1] == 2:
+            return probs[:, 1]
+
+        return probs
 
     def __getstate__(self):
         state = {slot: getattr(self, slot, None) for slot in self.__slots__}
