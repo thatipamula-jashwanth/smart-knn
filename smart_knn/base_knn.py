@@ -223,6 +223,9 @@ class SmartKNN:
 
         return np.sum(y_neighbors * w, axis=1) / np.sum(w, axis=1)
 
+    def _kneighbors_batch(self, Xq):
+        return _kneighbors_batch(self, Xq)
+
     def predict_proba(self, X):
         if not getattr(self, "fitted", False):
             raise RuntimeError("SmartKNN instance is not fitted yet.")
