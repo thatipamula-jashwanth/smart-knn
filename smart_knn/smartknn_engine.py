@@ -1,11 +1,10 @@
 import numpy as np
-import warnings
 from sklearn.metrics import r2_score
 
 try:
     from .backends.perf_backend import AnnBackend
     ANN_AVAILABLE = True
-except Exception:
+except ImportError:
     AnnBackend = None
     ANN_AVAILABLE = False
 
@@ -15,15 +14,19 @@ def _validate_ann_regression(self, max_samples=1024):
     if not ANN_AVAILABLE:
         raise RuntimeError("ANN backend not available.")
 
-    X_full, y_full = self.X_, self.y_
+    X_full = self.X_
+    y_full = self.y_
+
     n = X_full.shape[0]
 
     if n > max_samples:
-        sel = np.random.choice(n, max_samples, replace=False)
+        rng = np.random.default_rng(0)
+        sel = rng.choice(n, max_samples, replace=False)
         X = X_full[sel]
         y = y_full[sel]
     else:
-        X, y = X_full, y_full
+        X = X_full
+        y = y_full
 
     ann = AnnBackend(
         X,
@@ -34,8 +37,16 @@ def _validate_ann_regression(self, max_samples=1024):
 
     idx_mat, dist_mat = ann.kneighbors_batch(X, self.k)
 
+    if idx_mat.shape[1] < self.k:
+        raise RuntimeError("ANN backend returned insufficient neighbors")
+
+    if not np.isfinite(dist_mat).all():
+        raise RuntimeError("ANN backend returned invalid distances")
+
     w = 1.0 / np.maximum(dist_mat, 1e-9)
+
     y_neighbors = y[idx_mat]
+
     preds = np.sum(y_neighbors * w, axis=1) / np.sum(w, axis=1)
 
     return r2_score(y, preds)
@@ -43,32 +54,40 @@ def _validate_ann_regression(self, max_samples=1024):
 
 def _kneighbors_batch(self, Xq):
 
-    Xq = np.asarray(Xq, dtype=np.float32)
-    if Xq.ndim == 1:
-        Xq = Xq.reshape(1, -1)
+    Q = np.asarray(Xq, dtype=np.float32)
 
-    if not np.isfinite(Xq).all():
-        warnings.warn(
-            "NaN/Inf Detected in Query — APPLYING SAFE NORMALIZATION.",
-            RuntimeWarning,
-        )
+    if Q.ndim == 1:
+        Q = Q.reshape(1, -1)
 
-    Xq = np.nan_to_num(
-        Xq, nan=self.mean_, posinf=self.mean_, neginf=self.mean_
-    )
+    n_samples = self.X_.shape[0]
 
-    Xq = (Xq - self.mean_) / np.maximum(self.std_, 1e-12)
-    Q = Xq[:, self.feature_mask_]
+    cand_k = min(self.k * 5, n_samples)
 
-    approx_idx, _ = self.backend.kneighbors_batch(Q, self.k * 5)
+    approx_idx, _ = self.backend.kneighbors_batch(Q, cand_k)
 
     Xc = self.X_[approx_idx]
+
     diff = Xc - Q[:, None, :]
-    dist = np.sqrt(np.sum((diff * diff) * self.weights_, axis=2))
+
+    dist = np.sqrt(np.sum(diff * diff * self.weights_, axis=2))
+
+    if getattr(self, "global_u_", None) is not None:
+
+        proj_q = Q @ self.global_u_
+        proj_x = self.X_global_[approx_idx]
+
+        diff_global = proj_x - proj_q[:, None, :]
+
+        global_term = np.sqrt(np.sum(diff_global * diff_global, axis=2))
+
+        dist = dist + self.global_lambda * global_term
 
     top = np.argpartition(dist, self.k - 1, axis=1)[:, :self.k]
 
-    return (
-        np.take_along_axis(approx_idx, top, axis=1),
-        np.take_along_axis(dist, top, axis=1)
-    )
+    row_ids = np.arange(top.shape[0])[:, None]
+    top = top[row_ids, np.argsort(dist[row_ids, top])]
+
+    final_idx = np.take_along_axis(approx_idx, top, axis=1)
+    final_dist = np.take_along_axis(dist, top, axis=1)
+
+    return final_idx, final_dist
