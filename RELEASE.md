@@ -2,7 +2,7 @@
 
 ---
 
-# Release 0.2.3 — **SmartKNN v2.3**
+# Release 0.2.3 - **SmartKNN v2.3**
 
 This release focuses on **numerical stability, deterministic behavior, ANN correctness, and distance kernel performance**.  
 Several internal improvements were introduced to make SmartKNN more **robust, reproducible, and production-safe**.
@@ -27,9 +27,9 @@ distance = local_distance + global_lambda * global_distance
 
 Where:
 
-- `local_distance` — standard weighted feature distance
-- `global_distance` — dataset-level structural distance
-- `global_lambda` — controls contribution of global structure
+- `local_distance` - standard weighted feature distance
+- `global_distance` - dataset-level structural distance
+- `global_lambda` - controls contribution of global structure
 
 
 This ensures **full backward compatibility with previous versions** while enabling optional structural awareness.
@@ -138,7 +138,7 @@ Backends are automatically rebuilt during unpickling.
 
 ---
 
-# 2. Neighbor Search Engine (`smartknn_engine`)
+# 2. Neighbor Search Engine 
 
 ### Deterministic ANN Validation
 
@@ -204,7 +204,7 @@ This improves neighbor ranking without altering traditional KNN semantics.
 
 ---
 
-# 3. Distance Kernel Layer (`distance_kernels.py`)
+# 3. Distance Kernel Layer 
 
 ### Safe Numeric Cleaning
 
@@ -261,7 +261,7 @@ projected_bytes = nq * nx * 4
 
 ---
 
-# 4. ANN Backend (`AnnBackend`)
+# 4. ANN Backend
 
 ### ANN Import Safety
 
@@ -403,7 +403,7 @@ max(std, 1e-12)
 
 ---
 
-## Release 0.2.2 — **SmartKNN v2.2**
+## Release 0.2.2 - **SmartKNN v2.2**
 This release focuses on scalability, correctness of automatic decisions, and faster training on large-scale datasets, with multiple internal improvements across feature weighting and ANN indexing.
 
 ### Major Changes
